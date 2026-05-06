@@ -18,35 +18,34 @@ jobs:
           channel: 'stable'
           cache: true
 
-      # Думаем наперед: устанавливаем Rust, так как проект использует rust_lib_Bloomee
-      - name: Setup Rust
+      - name: Setup Rust (For Bloomee Core)
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-apple-ios, x86_64-apple-ios
 
-      - name: Clean and Upgrade Packages
-        # Принудительно обновляем pubspec.lock, чтобы забрать актуальные версии плагинов
+      - name: Upgrade Packages & Fix iOS Platform
         run: |
           flutter clean
+          # Принудительно обновляем все плагины, чтобы получить версию share_handler без багов
           flutter pub upgrade
           flutter pub get
+          
+          cd ios
+          # Сносим старые блокировки подов
+          rm -rf Podfile.lock Pods
+          
+          # Удаляем любые старые упоминания платформы в Podfile
+          sed -i '' '/platform :ios/d' Podfile
+          
+          # Железобетонно прописываем iOS 14.0 в самую первую строку файла
+          echo "platform :ios, '14.0'" | cat - Podfile > temp_podfile
+          mv temp_podfile Podfile
 
-      - name: Fix iOS Platform Version
-        working-directory: ios
-        run: |
-          sed -i '' "s/# platform :ios.*/platform :ios, '14.0'/g" Podfile
-
-      - name: Nuclear CocoaPods Reset & Install
-        working-directory: ios
-        # Сносим локальные кэши и качаем индексы напрямую из Git, обходя баги CDN
-        run: |
-          rm -rf Podfile.lock Pods ~/Library/Caches/CocoaPods
-          pod repo remove trunk || true
-          pod repo add trunk https://github.com/CocoaPods/Specs.git
-          pod repo update
-          pod install --repo-update
+      - name: Update CocoaPods (Safe Mode)
+        run: pod repo update
 
       - name: Build iOS (No Codesign)
+        # Flutter сам создаст нужные симлинки и соберет проект
         run: flutter build ios --release --no-codesign
 
       - name: Package to IPA
