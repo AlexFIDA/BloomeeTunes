@@ -29,7 +29,6 @@ jobs:
           flutter pub get
 
       - name: Deep Clean CocoaPods Cache
-        # Сносим вообще все кэши на macOS сервере, чтобы он перестал цепляться за старые версии
         run: |
           rm -rf ~/.cocoapods/repos
           pod cache clean --all
@@ -38,23 +37,19 @@ jobs:
         working-directory: ios
         run: |
           rm -rf Podfile.lock Pods
-          # Удаляем старую версию платформы и ставим надежную iOS 14.0
           sed -i '' '/platform :ios/d' Podfile
           echo "platform :ios, '14.0'" | cat - Podfile > temp_podfile
           mv temp_podfile Podfile
 
       - name: Generate Xcode Config & Symlinks
-        # Магическая команда: заставляет Flutter создать .symlinks для локальных плагинов,
-        # чтобы CocoaPods смог их найти, но при этом останавливает процесс до начала компиляции.
-        run: flutter build ios --config-only
+        # Добавили --no-codesign, чтобы Flutter не требовал сертификат на этапе настройки
+        run: flutter build ios --release --config-only --no-codesign
 
       - name: Manual Pod Install
         working-directory: ios
-        # Теперь, когда ярлыки на месте, мы жестко скачиваем зависимости
         run: pod install --repo-update
 
       - name: Build iOS (No Codesign)
-        # Собираем сам бинарник
         run: flutter build ios --release --no-codesign
 
       - name: Package to IPA
