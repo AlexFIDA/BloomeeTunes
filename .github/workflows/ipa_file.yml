@@ -18,24 +18,35 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Clean and Get Packages
+      # Думаем наперед: устанавливаем Rust, так как проект использует rust_lib_Bloomee
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios, x86_64-apple-ios
+
+      - name: Clean and Upgrade Packages
+        # Принудительно обновляем pubspec.lock, чтобы забрать актуальные версии плагинов
         run: |
           flutter clean
+          flutter pub upgrade
           flutter pub get
 
       - name: Fix iOS Platform Version
         working-directory: ios
-        # Находим закомментированную строку платформы и жестко прописываем iOS 14.0
         run: |
           sed -i '' "s/# platform :ios.*/platform :ios, '14.0'/g" Podfile
 
-      - name: Update CocoaPods Repo
+      - name: Nuclear CocoaPods Reset & Install
         working-directory: ios
-        # Обновляем индексы репозиториев, но НЕ запускаем pod install руками
-        run: pod repo update
+        # Сносим локальные кэши и качаем индексы напрямую из Git, обходя баги CDN
+        run: |
+          rm -rf Podfile.lock Pods ~/Library/Caches/CocoaPods
+          pod repo remove trunk || true
+          pod repo add trunk https://github.com/CocoaPods/Specs.git
+          pod repo update
+          pod install --repo-update
 
       - name: Build iOS (No Codesign)
-        # Эта команда сама создаст нужные симлинки для share_handler и скачает поды в правильный момент
         run: flutter build ios --release --no-codesign
 
       - name: Package to IPA
