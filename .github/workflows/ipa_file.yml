@@ -1,0 +1,39 @@
+name: Build Unsigned iOS App
+on: 
+  workflow_dispatch: # Позволяет запускать скрипт вручную
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Pod Install
+        working-directory: ios
+        run: pod install
+
+      - name: Build iOS (No Codesign)
+        run: flutter build ios --release --no-codesign
+
+      - name: Package to IPA
+        run: |
+          mkdir Payload
+          # Перемещаем скомпилированное приложение в папку Payload
+          mv build/ios/iphoneos/Runner.app Payload/
+          # Архивируем в формат .ipa
+          zip -qr BloomeeTunes.ipa Payload
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: BloomeeTunes-IPA
+          path: BloomeeTunes.ipa
