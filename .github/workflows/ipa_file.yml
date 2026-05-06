@@ -23,15 +23,15 @@ jobs:
         with:
           targets: aarch64-apple-ios, x86_64-apple-ios
 
+      # === ВАЖНО: ТА САМАЯ СЕРЕБРЯНАЯ ПУЛЯ ===
+      # Отключаем новый SwiftPM, чтобы он не ломал CocoaPods внутри share_handler
+      - name: Disable SwiftPM 
+        run: flutter config --no-enable-swift-package-manager
+
       - name: Prepare Flutter Packages
         run: |
           flutter clean
           flutter pub get
-
-      - name: Deep Clean CocoaPods Cache
-        run: |
-          rm -rf ~/.cocoapods/repos
-          pod cache clean --all
 
       - name: Fix iOS Platform Version
         working-directory: ios
@@ -41,15 +41,8 @@ jobs:
           echo "platform :ios, '14.0'" | cat - Podfile > temp_podfile
           mv temp_podfile Podfile
 
-      - name: Generate Xcode Config & Symlinks
-        # Добавили --no-codesign, чтобы Flutter не требовал сертификат на этапе настройки
-        run: flutter build ios --release --config-only --no-codesign
-
-      - name: Manual Pod Install
-        working-directory: ios
-        run: pod install --repo-update
-
       - name: Build iOS (No Codesign)
+        # Flutter сам скачает поды, и теперь, без SwiftPM, он корректно увидит share_handler_ios_models
         run: flutter build ios --release --no-codesign
 
       - name: Package to IPA
