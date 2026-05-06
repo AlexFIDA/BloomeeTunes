@@ -1,6 +1,9 @@
 name: Build Unsigned iOS App
 on: 
-  workflow_dispatch: # Позволяет запускать скрипт вручную
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   build:
@@ -13,23 +16,32 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
+          cache: true
 
-      - name: Install Dependencies
-        run: flutter pub get
+      - name: Clean and Get Packages
+        run: |
+          flutter clean
+          flutter pub get
 
-      - name: Pod Install
+      - name: Fix iOS Platform Version
         working-directory: ios
-        run: pod install
+        # Находим закомментированную строку платформы и жестко прописываем iOS 14.0
+        run: |
+          sed -i '' "s/# platform :ios.*/platform :ios, '14.0'/g" Podfile
+
+      - name: Update CocoaPods Repo
+        working-directory: ios
+        # Обновляем индексы репозиториев, но НЕ запускаем pod install руками
+        run: pod repo update
 
       - name: Build iOS (No Codesign)
+        # Эта команда сама создаст нужные симлинки для share_handler и скачает поды в правильный момент
         run: flutter build ios --release --no-codesign
 
       - name: Package to IPA
         run: |
           mkdir Payload
-          # Перемещаем скомпилированное приложение в папку Payload
           mv build/ios/iphoneos/Runner.app Payload/
-          # Архивируем в формат .ipa
           zip -qr BloomeeTunes.ipa Payload
 
       - name: Upload Artifact
